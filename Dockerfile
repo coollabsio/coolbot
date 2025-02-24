@@ -2,10 +2,15 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+# Install dependencies from the requirements file located in src/
+COPY src/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY bot.py .
-COPY .env .
+# Copy the entire src folder content into /app
+COPY src/ .
 
-CMD ["python", "bot.py"]
+# Ensure the database directory exists for volume mounting
+RUN mkdir -p /app/database
+
+# Run the bot (make sure main.py is your entrypoint)
+CMD ["python", "main.py"]

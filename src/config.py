@@ -1,0 +1,24 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+
+GENERAL_CHANNEL_ID = int(os.getenv('GENERAL_CHANNEL_ID'))
+SUPPORT_CHANNEL_ID = int(os.getenv('SUPPORT_CHANNEL_ID'))
+
+STARTUP_LOG_THREAD_ID = int(os.getenv('STARTUP_LOG_THREAD_ID'))
+POST_CREATE_LOG_THREAD_ID = int(os.getenv('POST_CREATE_LOG_THREAD_ID'))
+TEAM_THREAD_CHANNEL_ID = int(os.getenv('TEAM_THREAD_CHANNEL_ID'))
+
+AUTHORIZED_ROLE_ID = int(os.getenv('AUTHORIZED_ROLE_ID'))
+TEAM_ALERT_ROLE_ID = int(os.getenv('TEAM_ALERT_ROLE_ID'))
+
+
+COOLIFY_CLOUD_TAG_ID = int(os.getenv('COOLIFY_CLOUD_TAG_ID'))
+SOLVED_TAG_ID = int(os.getenv('SOLVED_TAG_ID'))
+NOT_SOLVED_TAG_ID = int(os.getenv('NOT_SOLVED_TAG_ID'))
+NEED_DEV_REVIEW_TAG_ID = int(os.getenv('NEED_DEV_REVIEW_TAG_ID'))
+UNANSWERED_TAG_ID = int(os.getenv('UNANSWERED_TAG_ID'))
+WAITING_FOR_REPLY_TAG_ID = int(os.getenv('WAITING_FOR_REPLY_TAG_ID'))
