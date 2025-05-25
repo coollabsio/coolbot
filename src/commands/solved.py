@@ -326,8 +326,19 @@ class SolvePost(commands.Cog):
 
         await interaction.response.defer()
 
-        # Edit tags: preserve others, add solved tag
-        new_tags = [t for t in thread.applied_tags if t.id != (COMMUNITY_SOLVED_TAG_ID if is_community else SOLVED_TAG_ID)]
+        # Edit tags: 
+        # • in support channels, remove everything except the Coolify tag  
+        # • in community channels, behave as before (just remove the community-solved tag)
+        if is_support:
+            new_tags = [
+                t for t in thread.applied_tags
+                if t.id == COOLIFY_CLOUD_TAG_ID
+            ]
+        else:
+            new_tags = [
+                t for t in thread.applied_tags
+                if t.id != COMMUNITY_SOLVED_TAG_ID
+            ]
         new_tags.append(solved_tag)
         await thread.edit(applied_tags=new_tags, reason="Marking post as solved")
 
