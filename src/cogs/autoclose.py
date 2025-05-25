@@ -48,7 +48,7 @@ class ConfirmCloseView(discord.ui.View):
             if coolify_tag and coolify_tag in self.post.applied_tags:
                 new_tags.append(coolify_tag)
 
-            await self.post.edit(applied_tags=new_tags, archived=True, locked=True)
+            await self.post.edit(applied_tags=new_tags, locked=True, archived=True)
             await self.post.send(
                 embed=discord.Embed(
                     title="Post Automatically Closed",
@@ -180,7 +180,7 @@ class AutoCloseCog(commands.Cog):
             new_tags = [solved_tag]
             if coolify_tag and coolify_tag in thread.applied_tags:
                 new_tags.append(coolify_tag)
-            await thread.edit(applied_tags=new_tags, archived=True, locked=True)
+            await thread.edit(applied_tags=new_tags, locked=True, archived=True,)
             await thread.send(
                 embed=discord.Embed(
                     title="Post Solved",
