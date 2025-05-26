@@ -3,6 +3,7 @@ from discord.ext import commands
 from config import (
     SUPPORT_CHANNEL_ID,
     UNANSWERED_TAG_ID,
+    SOLVED_TAG_ID,
     NOT_SOLVED_TAG_ID,
     WAITING_FOR_REPLY_TAG_ID
 )
@@ -58,8 +59,11 @@ class AutoAddCog(commands.Cog):
             last_message = msg
         waiting_tag = thread.parent.get_tag(WAITING_FOR_REPLY_TAG_ID)
         unanswered_tag = thread.parent.get_tag(UNANSWERED_TAG_ID)
+        solved_tag = thread.parent.get_tag(SOLVED_TAG_ID)
         if not waiting_tag or not unanswered_tag:
             return
+        if solved_tag in thread.applied_tags:
+            return     
         is_unanswered = unanswered_tag in thread.applied_tags
         if last_message.author == post_creator:
             if not is_unanswered and waiting_tag not in thread.applied_tags:

@@ -5,11 +5,13 @@ import asyncio
 import datetime
 
 from config import (
-            SOLVED_TAG_ID, 
-            NOT_SOLVED_TAG_ID, 
-            COOLIFY_CLOUD_TAG_ID, 
-            SUPPORT_CHANNEL_ID, 
-            AUTHORIZED_ROLE_ID,
+    SOLVED_TAG_ID,
+    NOT_SOLVED_TAG_ID,
+    COOLIFY_CLOUD_TAG_ID,
+    SUPPORT_CHANNEL_ID,
+    AUTHORIZED_ROLE_ID,
+    COMMUNITY_SUPPORT_CHANNEL_ID,
+    COMMUNITY_SOLVED_TAG_ID,
 )
 
 async def process_solved_thread(thread: discord.Thread, bot: commands.Bot):
@@ -24,7 +26,6 @@ async def is_user_authorized(thread: discord.Thread, user: discord.User) -> bool
     Determines whether the given user is authorized to modify the thread.
     Authorization is granted if the user is the post owner or has the authorized role.
     """
-    # Fetch the starter message of the thread
     starter = await thread.fetch_message(thread.id)
     post_owner_id = None
     if not starter.author.bot:
@@ -33,16 +34,92 @@ async def is_user_authorized(thread: discord.Thread, user: discord.User) -> bool
         if starter.mentions:
             post_owner_id = starter.mentions[0].id
 
-    # Check if the user is the post owner
     if post_owner_id is not None and user.id == post_owner_id:
         return True
 
-    # Check if the user has the authorized role
     if hasattr(user, 'roles'):
-        if any(role.id == AUTHORIZED_ROLE_ID for role in user.roles):
+        if any(role.id == AUTHORIZED_ROLE_ID for role in getattr(user, 'roles', [])):
             return True
 
     return False
+
+class CommunitySolvedButton(ui.Button):
+    def __init__(self, bot: commands.Bot, thread: discord.Thread):
+        super().__init__(
+            label="Mark as Solved",
+            style=discord.ButtonStyle.green,
+            custom_id="community_solved_button"
+        )
+        self.bot = bot
+        self.thread = thread
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await is_user_authorized(self.thread, interaction.user):
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="No Permission",
+                    description="You are not authorized to perform this action.",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+            return
+
+        community_tag = self.thread.parent.get_tag(COMMUNITY_SOLVED_TAG_ID)
+        if not community_tag:
+            await interaction.response.send_message("Community Solved tag not found.", ephemeral=True)
+            return
+
+        # Preserve other tags, only add community solved
+        new_tags = [t for t in self.thread.applied_tags if t.id != COMMUNITY_SOLVED_TAG_ID]
+        new_tags.append(community_tag)
+        await self.thread.edit(applied_tags=new_tags, reason="Marked community post as solved")
+
+        # Update message embed
+        embed = discord.Embed(
+            title="Post Solved",
+            description=f"{interaction.user.mention} marked this community post as solved.",
+            color=discord.Color.green()
+        )
+        view = ui.View(timeout=None)
+        view.add_item(CommunityNotSolvedButton(self.bot, self.thread))
+        await interaction.response.edit_message(embed=embed, view=view)
+
+class CommunityNotSolvedButton(ui.Button):
+    def __init__(self, bot: commands.Bot, thread: discord.Thread):
+        super().__init__(
+            label="Mark as Not Solved",
+            style=discord.ButtonStyle.grey,
+            custom_id="community_not_solved_button"
+        )
+        self.bot = bot
+        self.thread = thread
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await is_user_authorized(self.thread, interaction.user):
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="No Permission",
+                    description="You are not authorized to perform this action.",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+            return
+
+        # Remove only the community solved tag
+        new_tags = [t for t in self.thread.applied_tags if t.id != COMMUNITY_SOLVED_TAG_ID]
+        await self.thread.edit(applied_tags=new_tags, reason="Marked community post as not solved")
+
+        # Update message embed
+        embed = discord.Embed(
+            title="Post Not Solved",
+            description=f"**Post marked as NOT solved by {interaction.user.mention}.**",
+            color=discord.Color.orange()
+        )
+        view = ui.View(timeout=None)
+        view.add_item(CommunitySolvedButton(self.bot, self.thread))
+        await interaction.response.edit_message(embed=embed, view=view)
 
 class NotSolvedButton(ui.Button):
     def __init__(self, bot: commands.Bot, thread: discord.Thread):
@@ -57,7 +134,6 @@ class NotSolvedButton(ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            # Permission check: only post owner or authorized users may use this button
             if not await is_user_authorized(self.thread, interaction.user):
                 error_embed = discord.Embed(
                     title="Authorization Error",
@@ -67,10 +143,8 @@ class NotSolvedButton(ui.Button):
                 await interaction.response.send_message(embed=error_embed, ephemeral=True)
                 return
 
-            # Cancel any scheduled closure
             await interaction.client.post_closer.cancel_close(self.thread.id)
 
-            # Update tags
             allowed_tags = []
             coolify = self.thread.parent.get_tag(COOLIFY_CLOUD_TAG_ID)
             not_solved = self.thread.parent.get_tag(NOT_SOLVED_TAG_ID)
@@ -84,7 +158,6 @@ class NotSolvedButton(ui.Button):
 
             await self.thread.edit(applied_tags=allowed_tags, reason="Marked as not solved")
 
-            # Update the embed:
             original_embed = interaction.message.embeds[0]
             if original_embed.title == "Post Solved":
                 original_embed.title = "Post Not Solved"
@@ -95,15 +168,11 @@ class NotSolvedButton(ui.Button):
 
             view = ui.View(timeout=None)
             view.add_item(SolvedButton(self.bot, self.thread))
-            
             await interaction.response.edit_message(embed=original_embed, view=view)
             
             # Update the existing view record in database instead of creating a new one
             try:
-                # First try to remove any existing view for this message
                 await self.bot.db.remove_view(interaction.message.id)
-                
-                # Then add the new view
                 await self.bot.db.add_view(
                     message_id=interaction.message.id,
                     channel_id=interaction.channel_id,
@@ -131,7 +200,6 @@ class SolvedButton(ui.Button):
     async def callback(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer()
-            # Permission check
             if not await is_user_authorized(self.thread, interaction.user):
                 await interaction.followup.send(
                     embed=discord.Embed(
@@ -143,7 +211,6 @@ class SolvedButton(ui.Button):
                 )
                 return
 
-            # Update tags
             allowed_tags = []
             coolify = self.thread.parent.get_tag(COOLIFY_CLOUD_TAG_ID)
             solved = self.thread.parent.get_tag(SOLVED_TAG_ID)
@@ -156,41 +223,31 @@ class SolvedButton(ui.Button):
                 return
 
             await self.thread.edit(applied_tags=allowed_tags, reason="Marked as solved")
-
-            # Schedule thread closure
             close_time = await process_solved_thread(self.thread, interaction.client)
 
             original_embed = interaction.message.embeds[0]
             original_embed.title = f"~~{original_embed.title}~~"
-            
             if original_embed.description:
                 parts = original_embed.description.split('\n\n')  # Split on double newlines to preserve formatting
                 struck_parts = []
                 for part in parts:
-                    # If this part contains "NOT solved", strike through the whole thing
                     if "NOT solved" in part or not any("~~" in line for line in part.split('\n')):
                         struck_parts.append(f"~~{part}~~")
                     else:
-                        # Keep already struck-through parts as they are
                         struck_parts.append(part)
                 original_embed.description = '\n\n'.join(struck_parts)
 
             await interaction.message.edit(embed=original_embed, view=None)
 
-            # Send new message with NotSolved button
             new_embed = discord.Embed(
                 title="Post Solved",
                 description=f"{interaction.user.mention} marked this post as solved.\nIt will be automatically closed and locked <t:{close_time}:R>.",
                 color=discord.Color.green()
             )
-            
             view = ui.View(timeout=None)
-            not_solved_button = NotSolvedButton(self.bot, self.thread)
-            view.add_item(not_solved_button)
+            view.add_item(NotSolvedButton(self.bot, self.thread))
 
             new_message = await interaction.followup.send(embed=new_embed, view=view)
-            
-            # Update database records
             try:
                 await self.bot.db.remove_view(interaction.message.id)
                 await self.bot.db.add_view(
@@ -202,7 +259,6 @@ class SolvedButton(ui.Button):
                 )
             except Exception:
                 pass
-
         except Exception:
             try:
                 await interaction.followup.send("An error occurred while processing your request.", ephemeral=True)
@@ -215,14 +271,18 @@ class SolvePost(commands.Cog):
 
     @app_commands.command(name="solved", description="Mark the current post as solved")
     async def solved(self, interaction: discord.Interaction):
-        # Validate the channel
         if not isinstance(interaction.channel, discord.Thread):
             await interaction.response.send_message("This command can only be used in a thread.", ephemeral=True)
             return
         thread: discord.Thread = interaction.channel
 
-        if thread.parent.id != SUPPORT_CHANNEL_ID:
-            await interaction.response.send_message("This command is only for the support channel.", ephemeral=True)
+        # Determine channel type and tag
+        is_support = thread.parent.id == SUPPORT_CHANNEL_ID
+        is_community = thread.parent.id == COMMUNITY_SUPPORT_CHANNEL_ID
+        if not is_support and not is_community:
+            await interaction.response.send_message(
+                "This command is only for the support channels.", ephemeral=True
+            )
             return
 
         # Check permissions by determining the post owner.
@@ -233,57 +293,74 @@ class SolvePost(commands.Cog):
         else:
             if starter.mentions:
                 is_owner = (starter.mentions[0].id == interaction.user.id)
-
-        has_auth = any(role.id == AUTHORIZED_ROLE_ID for role in interaction.user.roles) if hasattr(interaction.user, 'roles') else False
-
+        has_auth = any(role.id == AUTHORIZED_ROLE_ID for role in getattr(interaction.user, 'roles', []))
         if not (is_owner or has_auth):
-            error_embed = discord.Embed(
-                title="No Permission",
-                description="You are not authorized to perform this action.",
-                color=discord.Color.red()
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="No Permission",
+                    description="You are not authorized to perform this action.",
+                    color=discord.Color.red()
+                ), ephemeral=True
             )
-            await interaction.response.send_message(embed=error_embed, ephemeral=True)
             return
 
-        # Check if already solved BEFORE deferring the response
-        solved_tag = thread.parent.get_tag(SOLVED_TAG_ID)
-        coolify = thread.parent.get_tag(COOLIFY_CLOUD_TAG_ID)
+        # Common tag fetch
+        solved_tag = None
+        if is_support:
+            solved_tag = thread.parent.get_tag(SOLVED_TAG_ID)
+        else:
+            solved_tag = thread.parent.get_tag(COMMUNITY_SOLVED_TAG_ID)
         if not solved_tag:
             await interaction.response.send_message("Solved tag not found.", ephemeral=True)
             return
 
+        # Already solved check
         if solved_tag in thread.applied_tags:
-            embed = discord.Embed(
-                title="Post Already Solved",
-                description="This post is already marked as solved.",
-                color=discord.Color.green()
+            title = "Post Already Solved"
+            desc = "This post is already marked as solved."
+            await interaction.response.send_message(
+                embed=discord.Embed(title=title, description=desc, color=discord.Color.green()),
+                ephemeral=True
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         await interaction.response.defer()
 
-        allowed_tags = [solved_tag]
-        if coolify and coolify in thread.applied_tags:
-            allowed_tags.append(coolify)
-        await thread.edit(applied_tags=allowed_tags, reason="Marking post as solved")
+        # Edit tags: 
+        # • in support channels, remove everything except the Coolify tag  
+        # • in community channels, behave as before (just remove the community-solved tag)
+        if is_support:
+            new_tags = [
+                t for t in thread.applied_tags
+                if t.id == COOLIFY_CLOUD_TAG_ID
+            ]
+        else:
+            new_tags = [
+                t for t in thread.applied_tags
+                if t.id != COMMUNITY_SOLVED_TAG_ID
+            ]
+        new_tags.append(solved_tag)
+        await thread.edit(applied_tags=new_tags, reason="Marking post as solved")
 
-        # Schedule thread closure
-        close_time = await process_solved_thread(thread, interaction.client)
+        if is_support:
+            close_time = await process_solved_thread(thread, interaction.client)
+            embed = discord.Embed(
+                title="Post Solved",
+                description=f"{interaction.user.mention} marked this post as solved.\nIt will be automatically closed and locked <t:{close_time}:R>.",
+                color=discord.Color.green()
+            )
+            view = ui.View()
+            view.add_item(NotSolvedButton(self.bot, thread))
+            await interaction.followup.send(embed=embed, view=view)
+        else:
+            embed = discord.Embed(
+                title="Post Solved",
+                description=f"{interaction.user.mention} marked this community post as solved.",
+                color=discord.Color.green()
+            )
+            view = ui.View()
+            view.add_item(CommunityNotSolvedButton(self.bot, thread))
+            await interaction.followup.send(embed=embed, view=view)
 
-        now = datetime.datetime.now(datetime.timezone.utc)
-        one_hour = now + datetime.timedelta(hours=1)
-        embed = discord.Embed(
-            title="Post Solved",
-            description=f"{interaction.user.mention} marked this post as solved.\nIt will be automatically closed and locked <t:{round(one_hour.timestamp())}:R>.",
-            color=discord.Color.green()
-        )
-        view = ui.View()
-        not_solved_button = NotSolvedButton(self.bot, thread)
-        view.add_item(not_solved_button)
-        
-        message = await interaction.followup.send(embed=embed, view=view, ephemeral=False)
-        not_solved_button.message = message
-        
 async def setup(bot: commands.Bot):
     await bot.add_cog(SolvePost(bot))
