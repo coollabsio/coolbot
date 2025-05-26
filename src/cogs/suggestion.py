@@ -64,8 +64,8 @@ class SuggestionCog(commands.Cog):
                 return
 
             # Define regex patterns.
-            positive_pattern = r'(^solved$|solved\b|^ty$|\sty|thank|work|fixed|thx|tysm|appreciate|resolved|success|cheers|issue resolved|thank you|helped|problem solved|finally|woohoo)'
-            negative_pattern = r"(doesn'?t|isn'?t|not?|but|before|won't|still|yet|having trouble|still having issues|no|never|wrong|nope|not quite|not really|unfortunately|regrettably|sadly)"
+            positive_pattern = r'\b(solved|thank(s| you)?|thanks|thx|tysm|appreciate(d)?|resolved|success(fully)?|cheers|problem solved|issue resolved|finally (fixed|solved)?|woohoo|helped)\b'
+            negative_pattern = r"\b(doesn'?t|isn'?t|not|no|never|wrong|unfortunately|regrettably|sadly|still|yet|can't|cannot|won't|nope|not really|not quite|having trouble|issue persists|didn'?t|before|but)\b"
 
             # Do not send a suggestion if negative phrases are detected.
             if re.search(negative_pattern, content, re.IGNORECASE):
