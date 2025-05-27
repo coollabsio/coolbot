@@ -113,7 +113,7 @@ class IncompletePost(commands.Cog):
             title="Incomplete support post",
             description=(
                 "We’re happy to help, but we need a bit more info first.\n\n"
-                f"Please take a moment to read the pinned post ( https://discord.com/channels/459365938081431553/1354540227128987872 ) and share the required details <t:{future_ts}:R>.\n\n"
+                f"Please take a moment to read the pinned post ( https://discord.com/channels/459365938081431553/1376791448657203201 ) and share the required details <t:{future_ts}:R>.\n\n"
                 f"The post will close automatically if you do not respond."
             ),
             color=discord.Color.orange()
