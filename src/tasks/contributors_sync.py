@@ -24,12 +24,12 @@ class ContributorsSync:
 
     async def sync_contributors_from_github(self) -> int:
         """Sync contributors from GitHub API for all configured repos"""
-        from config import GITHUB_REPOS
+        from config import REPOSITORIES
 
         total_contributors = 0
 
         async with aiohttp.ClientSession() as session:
-            for repo in GITHUB_REPOS:
+            for repo in REPOSITORIES:
                 if not repo.strip():
                     continue
 

@@ -86,7 +86,7 @@ class PageCog(commands.Cog):
                                                     print(f"Webhook error: {e}")
 
                                         # Log the response
-                                        await self.send_simple_log(f"Page response received: {title}")
+                                        await self.send_simple_log(f"Page response received: `{title}`")
 
                                         if random_id in self.page_websockets:
                                             self.page_websockets[random_id].cancel()

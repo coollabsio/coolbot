@@ -8,17 +8,7 @@ import secrets
 import string
 from typing import List
 
-# Repository configuration - repos under organization
-# Format: orgname/reponame
-REPOSITORIES = [
-    "coollabsio/coolify",
-    "coollabsio/coolify-docs",
-    "coollabsio/coolify-cli",
-    "coollabsio/coolify-examples",
-    "coollabsio/coolify.io"
-]
-
-from config import CONTRIBUTORS_CHANNEL_ID, CONTRIBUTOR_ROLE_ID
+from config import CONTRIBUTORS_CHANNEL_ID, CONTRIBUTOR_ROLE_ID, REPOSITORIES
 
 def generate_verification_token():
     """Generate a random verification token"""
@@ -205,22 +195,22 @@ class ContributorRoleView(View):
             token = generate_verification_token()
 
             # Store token in database
-            await self.cog.bot.db.create_verification_token(member.id, token)
+            await self.cog.bot.db.create_verification_token(member.id, token, expires_in_minutes=5)
 
             # Show verification instructions
             embed = discord.Embed(
-                title="🔐 GitHub Verification Required",
+                title="GitHub verification required",
                 description="To verify your GitHub account ownership, please follow these steps:\n\n"
                            f"**Step 1: Copy this verification token**\n"
-                           f"```\n{token}\n```\n"
+                           f"```\n{token}\n```\n\n"
                            "**Step 2: Add token to your GitHub profile**\n"
-                           "Go to your [GitHub profile](https://github.com/settings/profile) and temporarily add the token above to your bio field.\n\n"
+                           "- Go to your [GitHub profile](https://github.com/settings/profile) and temporarily add the token above to your bio field.\n\n\n"
                            "**Step 3: Enter your GitHub username**\n"
-                           "Once you've added the token to your bio, click the button below to enter your GitHub username.",
+                           "- Once you've added the token to your bio, click the button below to enter your GitHub username.",
                 color=discord.Color.blue()
             )
 
-            embed.set_footer(text="Token expires in 24 hours. You can remove it from your bio after verification.")
+            embed.set_footer(text="Token expires in 5 minutes. You can remove it from your bio after verification.")
 
             followup_msg = await interaction.followup.send(embed=embed, ephemeral=True, wait=True)
             view = GitHubUsernameVerificationView(self.cog, member, interaction.guild)

@@ -283,10 +283,10 @@ class Database:
             await db.commit()
 
     # GitHub verification methods
-    async def create_verification_token(self, user_id: int, token: str, expires_in_hours: int = 24):
+    async def create_verification_token(self, user_id: int, token: str, expires_in_minutes: int = 24*60):
         """Create a verification token for a user"""
         import time
-        expires_at = int(time.time()) + (expires_in_hours * 3600)
+        expires_at = int(time.time()) + (expires_in_minutes * 60)
 
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""

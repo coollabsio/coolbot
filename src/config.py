@@ -22,7 +22,7 @@ WAITING_FOR_REPLY_TAG_ID = int(os.getenv('WAITING_FOR_REPLY_TAG_ID'))
 
 COMMUNITY_SUPPORT_CHANNEL_ID = int(os.getenv('COMMUNITY_SUPPORT_CHANNEL_ID'))
 COMMUNITY_SOLVED_TAG_ID = int(os.getenv('COMMUNITY_SOLVED_TAG_ID'))
-PRIVATE_DATA_THREAD_ID = int(os.getenv('PRIVATE_DATA_THREAD_ID'))
+PRIVATE_DATA_CHANNEL_ID = int(os.getenv('PRIVATE_DATA_CHANNEL_ID'))
 COOLBOT_ADMIN_ROLE_ID = int(os.getenv('COOLBOT_ADMIN_ROLE_ID'))
 DEV_SUPPORT_STATION_CHANNEL_ID = int(os.getenv('DEV_SUPPORT_STATION_CHANNEL_ID'))
 CLOUD_SUPPORT_ALERT_ROLE_ID = int(os.getenv('CLOUD_SUPPORT_ALERT_ROLE_ID'))
@@ -41,4 +41,13 @@ NTFY_SECOND_TOPIC = os.getenv('NTFY_SECOND_TOPIC')
 # Contributor role configuration
 CONTRIBUTORS_CHANNEL_ID = int(os.getenv('CONTRIBUTORS_CHANNEL_ID'))
 CONTRIBUTOR_ROLE_ID = int(os.getenv('CONTRIBUTOR_ROLE_ID'))
-GITHUB_REPOS = os.getenv('GITHUB_REPOS', '').split(',')  # Comma-separated list of repos like 'coollabsio/coolify,coollabsio/documentation'
+
+# Repository configuration - repos under organization
+# Format: orgname/reponame
+REPOSITORIES = [
+    "coollabsio/coolify",
+    "coollabsio/coolify-docs",
+    "coollabsio/coolify-cli",
+    "coollabsio/coolify-examples",
+    "coollabsio/coolify.io"
+]
