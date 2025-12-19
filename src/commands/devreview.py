@@ -5,10 +5,11 @@ import logging
 
 from config import (
     NEED_DEV_REVIEW_TAG_ID,
-    TEAM_THREAD_CHANNEL_ID,
     AUTHORIZED_ROLE_ID,
-    TEAM_ALERT_ROLE_ID,
-    COOLIFY_CLOUD_TAG_ID
+    COOLIFY_CLOUD_TAG_ID,
+    DEV_SUPPORT_STATION_CHANNEL_ID,
+    CLOUD_SUPPORT_ALERT_ROLE_ID,
+    CORE_DEVELOPER_SUPPORT_ALERT_ROLE_ID
 )
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ async def process_immediate_alert(post: discord.Thread, staff: discord.Member, b
     Sends an embed with details (and any additional info) to the designated team channel,
     updates the forum post's tags, and notifies the post.
     """
-    team_channel = bot.get_channel(TEAM_THREAD_CHANNEL_ID)
+    team_channel = bot.get_channel(DEV_SUPPORT_STATION_CHANNEL_ID)
     if team_channel is None:
         return
 
@@ -33,9 +34,11 @@ async def process_immediate_alert(post: discord.Thread, staff: discord.Member, b
 
     if COOLIFY_CLOUD_TAG_ID in current_tag_ids:
         new_tags = [discord.Object(id=COOLIFY_CLOUD_TAG_ID), discord.Object(id=NEED_DEV_REVIEW_TAG_ID)]
+        alert_role_id = CLOUD_SUPPORT_ALERT_ROLE_ID
         is_coolify_cloud = True
     else:
         new_tags = [discord.Object(id=NEED_DEV_REVIEW_TAG_ID)]
+        alert_role_id = CORE_DEVELOPER_SUPPORT_ALERT_ROLE_ID
         is_coolify_cloud = False
 
     try:
@@ -84,15 +87,27 @@ async def process_immediate_alert(post: discord.Thread, staff: discord.Member, b
     description_lines = basic_info_lines + user_info_lines
     new_description = "\n".join(description_lines)
 
-    # Set the embed color to #9c7eff and update the footer with the staff's display name.
+    # Set the embed color to orange and update the footer with the staff's display name.
     embed = discord.Embed(
         description=new_description,
-        color=discord.Color(int("9c7eff", 16))
+        color=discord.Color.orange()
     )
     embed.set_footer(text=f"Invoked by {staff.display_name}")
 
     try:
-        await team_channel.send(content=f"Hey <@&{TEAM_ALERT_ROLE_ID}> a support post needs your attention!", embed=embed)
+        view = AlertView(bot)
+        sent_msg = await team_channel.send(content=f"Hey <@&{alert_role_id}> a support post needs your attention!", embed=embed, view=view)
+        # Save the alert view to database
+        try:
+            await bot.db.add_view(
+                message_id=sent_msg.id,
+                channel_id=DEV_SUPPORT_STATION_CHANNEL_ID,
+                thread_id=None,  # Not in a thread
+                view_type='alert',
+                post_owner_id=None
+            )
+        except Exception as e:
+            pass
     except Exception as e:
         pass
 
@@ -303,6 +318,28 @@ class RequestMoreInfoModal(discord.ui.Modal, title="coolLabs Support"):
             pass
 
 
+class AlertView(discord.ui.View):
+    """
+    A view for the alert message sent to the channel, with a button to mark as solved.
+    """
+    def __init__(self, bot: commands.Bot):
+        super().__init__(timeout=None)
+        self.bot = bot
+
+    @discord.ui.button(
+        label="Mark as solved?",
+        style=discord.ButtonStyle.success,
+        custom_id="mark_solved"
+    )
+    async def mark_solved_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            embed = interaction.message.embeds[0]
+            embed.color = discord.Color.green()
+            await interaction.message.edit(embed=embed, view=None)
+            await self.bot.db.remove_view(interaction.message.id)
+        except Exception as e:
+            pass
+
 class MarkReviewView(discord.ui.View):
     """
     A view with two buttons:
@@ -310,13 +347,13 @@ class MarkReviewView(discord.ui.View):
       • "Request user for more info and automate alert" – Edits the message to ask the executor to choose the user.
     """
     def __init__(self, post: discord.Thread, staff: discord.Member, bot: commands.Bot):
-        super().__init__(timeout=180) 
+        super().__init__(timeout=180)
         self.post = post
         self.staff = staff
         self.bot = bot
 
     @discord.ui.button(
-        label="Alert the developer and add the tag", 
+        label="Alert the developer and add the tag",
         style=discord.ButtonStyle.primary,
         custom_id="alert_dev"
     )
@@ -325,12 +362,12 @@ class MarkReviewView(discord.ui.View):
             await interaction.response.defer(ephemeral=True)
         except Exception as e:
             pass
-            
+
         try:
             await process_immediate_alert(self.post, self.staff, self.bot)
         except Exception as e:
             pass
-            
+
         try:
             await interaction.delete_original_response()
         except Exception as e:
@@ -340,12 +377,15 @@ class MarkReviewView(discord.ui.View):
         try:
             message = await self.post.fetch_message(interaction.message.id)
             await self.bot.db.remove_view(message.id)
+        except discord.NotFound:
+            # Message was deleted, view cleanup is handled by on_raw_message_delete
+            pass
         except Exception as e:
             logger.error(f"Failed to remove view from database: {e}")
             pass
 
     @discord.ui.button(
-        label="Request details from user and auto-send alert", 
+        label="Request details from user and auto-send alert",
         style=discord.ButtonStyle.secondary,
         custom_id="request_info"
     )
