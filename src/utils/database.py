@@ -73,6 +73,16 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS automoderation_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE NOT NULL,
+                    regex TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             await db.commit()
 
     async def create_tables(self):
@@ -359,6 +369,36 @@ class Database:
                 # If no rows affected, try by id
                 try:
                     await db.execute("DELETE FROM autoresponses WHERE id = ?", (int(identifier),))
+                except ValueError:
+                    pass  # Not an int, ignore
+            await db.commit()
+
+    # Automoderation rules methods
+    async def add_automoderation_rule(self, name: str, regex: str, reason: str):
+        """Add a new automoderation rule"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                INSERT INTO automoderation_rules (name, regex, reason)
+                VALUES (?, ?, ?)
+            """, (name, regex, reason))
+            await db.commit()
+
+    async def get_automoderation_rules(self):
+        """Get all automoderation rules"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM automoderation_rules ORDER BY name") as cursor:
+                return await cursor.fetchall()
+
+    async def delete_automoderation_rule(self, identifier: str):
+        """Delete an automoderation rule by name or id"""
+        async with aiosqlite.connect(self.db_path) as db:
+            # Try to delete by name first
+            await db.execute("DELETE FROM automoderation_rules WHERE name = ?", (identifier,))
+            if db.total_changes == 0:
+                # If no rows affected, try by id
+                try:
+                    await db.execute("DELETE FROM automoderation_rules WHERE id = ?", (int(identifier),))
                 except ValueError:
                     pass  # Not an int, ignore
             await db.commit()

@@ -162,7 +162,7 @@ class AutoResponder(commands.Cog):
         try:
             await self.bot.db.delete_autoresponse(identifier)
             await interaction.response.send_message(
-                f"Autoresponse '{identifier}' deleted successfully.",
+                f"Autoresponse `{identifier}` deleted successfully.",
                 ephemeral=True
             )
         except Exception as e:
