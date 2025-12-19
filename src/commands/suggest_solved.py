@@ -66,9 +66,47 @@ class SuggestSolved(commands.Cog):
                 last_owner_msg = msg
                 break
 
-        if not last_owner_msg:
+        embed = discord.Embed(
+            title="Mark as Solved?",
+            description=(
+                "It looks like your issue might be solved. "
+                "If that's the case, please click the button below to mark this post as solved."
+            ),
+            color=discord.Color.green()
+        )
+
+        solved_button = SolvedButton(self.bot, thread)
+        view = ui.View(timeout=None)
+        view.add_item(solved_button)
+
+        # Reply to owner's last message or send new message mentioning owner
+        try:
+            if last_owner_msg:
+                await last_owner_msg.reply(
+                    embed=embed,
+                    view=view,
+                    mention_author=True,
+                    allowed_mentions=discord.AllowedMentions(users=True)
+                )
+            else:
+                await thread.send(
+                    f"Hey <@{owner_id}>!",
+                    embed=embed,
+                    view=view,
+                    allowed_mentions=discord.AllowedMentions(users=True)
+                )
             await interaction.followup.send(
-                "Could not find a recent message from the post owner to reply to.",
+                "Suggestion sent to the post owner.",
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "I don't have permission to send messages in this thread.",
+                ephemeral=True
+            )
+        except discord.HTTPException:
+            await interaction.followup.send(
+                "Failed to send the suggestion. Please try again later.",
                 ephemeral=True
             )
             return
