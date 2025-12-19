@@ -11,11 +11,13 @@ sys.path.append(str(Path(__file__).parent))
 
 from utils.database import Database
 from tasks.post_closer import PostCloser
+from tasks.docs_sync import DocsSync
 from utils.view_loader import load_persistent_views
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="c!", intents=intents)
 bot.post_closer = PostCloser(bot)
+bot.docs_sync = DocsSync(bot)
 
 async def load_extensions(bot: commands.Bot):
     base_path = Path(__file__).parent.absolute()
@@ -60,6 +62,10 @@ async def on_ready():
         await bot.post_closer.initialize_tasks()
     except Exception as e:
         print(f"Error initializing post_closer tasks: {e}")
+    try:
+        await bot.docs_sync.initialize_tasks()
+    except Exception as e:
+        print(f"Error initializing docs_sync tasks: {e}")
     try:
         await load_persistent_views(bot)
     except Exception as e:
