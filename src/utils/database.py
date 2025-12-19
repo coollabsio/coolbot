@@ -46,6 +46,23 @@ class Database:
                     value TEXT
                 )
             """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS contributors (
+                    github_username TEXT NOT NULL,
+                    contributed_repo_name TEXT NOT NULL,
+                    UNIQUE(github_username, contributed_repo_name)
+                )
+            """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS github_verifications (
+                    user_id INTEGER PRIMARY KEY,
+                    verification_token TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP NOT NULL
+                )
+            """)
             await db.commit()
 
     async def create_tables(self):
@@ -224,3 +241,84 @@ class Database:
         except Exception as e:
             status_info["error"] = str(e)
             return False, status_info
+
+    # Contributors methods
+    async def add_contributor(self, github_username: str, contributed_repo_name: str):
+        """Add a contributor to the database"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                INSERT INTO contributors (github_username, contributed_repo_name)
+                VALUES (?, ?)
+                ON CONFLICT(github_username, contributed_repo_name) DO NOTHING
+            """, (github_username, contributed_repo_name))
+            await db.commit()
+
+    async def get_contributors(self):
+        """Get all contributors"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM contributors") as cursor:
+                return await cursor.fetchall()
+
+    async def is_contributor(self, github_username: str, contributed_repo_name: Optional[str] = None):
+        """Check if a user is a contributor. If repo_name is None, check any repo."""
+        async with aiosqlite.connect(self.db_path) as db:
+            if contributed_repo_name:
+                async with db.execute("""
+                    SELECT 1 FROM contributors
+                    WHERE github_username = ? AND contributed_repo_name = ?
+                """, (github_username, contributed_repo_name)) as cursor:
+                    return await cursor.fetchone() is not None
+            else:
+                async with db.execute("""
+                    SELECT 1 FROM contributors
+                    WHERE github_username = ?
+                """, (github_username,)) as cursor:
+                    return await cursor.fetchone() is not None
+
+    async def clear_contributors(self):
+        """Clear all contributors"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("DELETE FROM contributors")
+            await db.commit()
+
+    # GitHub verification methods
+    async def create_verification_token(self, user_id: int, token: str, expires_in_hours: int = 24):
+        """Create a verification token for a user"""
+        import time
+        expires_at = int(time.time()) + (expires_in_hours * 3600)
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                INSERT OR REPLACE INTO github_verifications (user_id, verification_token, expires_at)
+                VALUES (?, ?, ?)
+            """, (user_id, token, expires_at))
+            await db.commit()
+
+    async def get_verification_token(self, user_id: int):
+        """Get verification token for a user"""
+        import time
+        current_time = int(time.time())
+
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("""
+                SELECT verification_token FROM github_verifications
+                WHERE user_id = ? AND expires_at > ?
+            """, (user_id, current_time)) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else None
+
+    async def remove_verification_token(self, user_id: int):
+        """Remove verification token for a user"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("DELETE FROM github_verifications WHERE user_id = ?", (user_id,))
+            await db.commit()
+
+    async def cleanup_expired_tokens(self):
+        """Clean up expired verification tokens"""
+        import time
+        current_time = int(time.time())
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("DELETE FROM github_verifications WHERE expires_at <= ?", (current_time,))
+            await db.commit()

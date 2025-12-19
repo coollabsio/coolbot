@@ -37,3 +37,8 @@ PAGE_RESPONSE_WEBHOOK_URL = os.getenv('PAGE_RESPONSE_WEBHOOK_URL')
 # NTFY configuration for /page alerts
 NTFY_TOPIC_NAME = os.getenv('NTFY_TOPIC_NAME')
 NTFY_SECOND_TOPIC = os.getenv('NTFY_SECOND_TOPIC')
+
+# Contributor role configuration
+CONTRIBUTORS_CHANNEL_ID = int(os.getenv('CONTRIBUTORS_CHANNEL_ID'))
+CONTRIBUTOR_ROLE_ID = int(os.getenv('CONTRIBUTOR_ROLE_ID'))
+GITHUB_REPOS = os.getenv('GITHUB_REPOS', '').split(',')  # Comma-separated list of repos like 'coollabsio/coolify,coollabsio/documentation'
