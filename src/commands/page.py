@@ -58,13 +58,13 @@ class PageCog(commands.Cog):
                     await self.send_simple_log(f"WS connected to ID: `{random_id}`")
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
-                            await self.send_simple_log(f"WS event received `Type: TEXT | ID: `{random_id}`")
+                            await self.send_simple_log(f"WS event received: Type: `TEXT` | ID: `{random_id}`")
                         elif msg.type == aiohttp.WSMsgType.ERROR:
-                            await self.send_simple_log(f"WS event received `Type: ERROR | ID: `{random_id}`")
+                            await self.send_simple_log(f"WS event received: Type: `ERROR` | ID: `{random_id}`")
                         elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            await self.send_simple_log(f"WS event received `Type: CLOSED | ID: `{random_id}`")
+                            await self.send_simple_log(f"WS event received: Type: `CLOSED` | ID: `{random_id}`")
                         else:
-                            await self.send_simple_log(f"WS event received `Type: {msg.type} | ID: `{random_id}`")
+                            await self.send_simple_log(f"WS event received: Type: `{msg.type}` | ID: `{random_id}`")
 
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             try:
