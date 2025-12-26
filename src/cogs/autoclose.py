@@ -25,13 +25,17 @@ class ConfirmCloseView(discord.ui.View):
         return user.id == self.post_owner_id or any(role.id == self.authorized_role_id for role in user.roles)
 
     async def update_embed(self, interaction: discord.Interaction, solved: typing.Optional[bool]):
-        embed = interaction.message.embeds[0]
-        embed.title = f"~~{embed.title}~~"
-        if solved is None:
-            embed.description = f"~~{embed.description}~~\n\n<@{self.post_owner_id}> said this post is not solved, so we will keep it open."
-        else:
-            embed.description = f"~~{embed.description}~~\n\n<@{self.post_owner_id}> said this post is solved."
-        await interaction.edit_original_response(embed=embed, view=None)
+        try:
+            embed = interaction.message.embeds[0]
+            embed.title = f"~~{embed.title}~~"
+            if solved is None:
+                embed.description = f"~~{embed.description}~~\n\n<@{self.post_owner_id}> said this post is not solved, so we will keep it open."
+            else:
+                embed.description = f"~~{embed.description}~~\n\n<@{self.post_owner_id}> said this post is solved."
+            await interaction.edit_original_response(embed=embed, view=None)
+        except (discord.NotFound, AttributeError):
+            # Message might have been deleted or embeds might not exist, continue anyway
+            pass
 
     async def start_timer(self):
         self.timer_task = asyncio.create_task(self.auto_close())
@@ -81,7 +85,11 @@ class ConfirmCloseView(discord.ui.View):
 
         await self.post.edit(applied_tags=new_tags, archived=True, locked=True)
         await self.update_embed(interaction, solved=True)
-        await self.bot.db.remove_view(interaction.message.id)
+        try:
+            await self.bot.db.remove_view(interaction.message.id)
+        except Exception:
+            # View might have been cleaned up already by message deletion handler
+            pass
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.gray, custom_id="confirm_cancel")
     async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -96,7 +104,11 @@ class ConfirmCloseView(discord.ui.View):
             self.timer_task.cancel()  # Stop timer if user cancels
             
         await self.update_embed(interaction, solved=None)
-        await self.bot.db.remove_view(interaction.message.id)
+        try:
+            await self.bot.db.remove_view(interaction.message.id)
+        except Exception:
+            # View might have been cleaned up already by message deletion handler
+            pass
 
 class AutoCloseCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -104,6 +116,13 @@ class AutoCloseCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        # Clean up persistent views from database when messages are deleted
+        try:
+            await self.bot.db.remove_view(payload.message_id)
+        except Exception:
+            # View might not exist in database, which is fine
+            pass
+
         if payload.message_id == payload.channel_id:
             thread = self.bot.get_channel(payload.channel_id)
             if isinstance(thread, discord.Thread) and thread.parent_id == SUPPORT_CHANNEL_ID:
@@ -180,7 +199,8 @@ class AutoCloseCog(commands.Cog):
             new_tags = [solved_tag]
             if coolify_tag and coolify_tag in thread.applied_tags:
                 new_tags.append(coolify_tag)
-            await thread.edit(applied_tags=new_tags, locked=True, archived=True,)
+            await thread.edit(locked=True, applied_tags=new_tags)
+            await thread.edit(archived=True)
             await thread.send(
                 embed=discord.Embed(
                     title="Post Solved",
@@ -191,7 +211,7 @@ class AutoCloseCog(commands.Cog):
             # Remove close task from db
             await self.bot.db.remove_close_task(thread.id)
         except Exception as e:
-            print(f"Error auto-closing thread on owner leave: {e}")
+            logger.error(f"Error auto-closing thread on owner leave: {e}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoCloseCog(bot))

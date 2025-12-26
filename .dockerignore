@@ -3,3 +3,5 @@ README.md
 .gitignore
 assets/
 env.example
+**/.venv
+**/__pycache__

@@ -167,10 +167,10 @@ class CreatePost(commands.Cog):
     async def send_support_embed(self, thread_msg):
         embed = discord.Embed(title="Note")
         embed.description = (
-            "Please remember that everyone in this server helps others voluntarily.\n\n"
+            "Please remember that everyone in this community helps others voluntarily.\n\n"
             "Do not ping anyone (including Admins, Mods, Community Experts, or Developers) for attention, "
             "and avoid posting your question or request in any other channel.\n\n"
-            "Failure to follow these guidelines may result in temporary exclusion from the server.\n\n"
+            "Failure to follow these guidelines may result in temporary exclusion from the community.\n\n"
             "While you wait, you can refer to our [documentation](https://coolify.io/docs/) for potential solutions to your issue."
         )
         await thread_msg.channel.send(embed=embed)
@@ -179,9 +179,10 @@ class CreatePost(commands.Cog):
         gen = self.bot.get_channel(GENERAL_CHANNEL_ID)
         if gen:
           await gen.send(
-              f"Hey {replied_message.author.mention}, you were in the wrong channel for help, so we’ve created a post in the correct channel and moved your message there. Please continue on: {thread_msg.jump_url} \n"
-              "-# For help, always use the proper support channel, even if it's just a quick yes or no answer."
+              f"Hey {replied_message.author.mention}! We’ve moved your message to the support channel so it’s easier for everyone to assist. You can continue the conversation here: {thread_msg.jump_url}\n"
+              "-# Friendly reminder: Using the support channels for questions (even quick yes/no ones) helps us get you answers faster and keeps things organized!"
           )
+
 
     async def send_log(self, message, replied_message, content, files, thread_msg):
         logs = self.bot.get_channel(POST_CREATE_LOG_THREAD_ID)

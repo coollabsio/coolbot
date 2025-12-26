@@ -4,7 +4,7 @@ from discord import app_commands
 import logging
 
 from config import (
-    PRIVATE_DATA_THREAD_ID,
+    PRIVATE_DATA_CHANNEL_ID,
     AUTHORIZED_ROLE_ID
 )
 
@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 
 async def forward_private_details(submitter: discord.Member, executor: discord.Member, bot: commands.Bot, details: str, thread: discord.Thread):
     """
-    Forwards the submitted details to the private data thread as an embed, pinging the executor.
+    Forwards the submitted details to the private data channel as an embed, pinging the executor.
     """
-    private_thread = bot.get_channel(PRIVATE_DATA_THREAD_ID)
-    if private_thread is None:
-        logger.error(f"Private data thread {PRIVATE_DATA_THREAD_ID} not found.")
+    private_channel = bot.get_channel(PRIVATE_DATA_CHANNEL_ID)
+    if private_channel is None:
+        logger.error(f"Private data channel {PRIVATE_DATA_CHANNEL_ID} not found.")
         return
 
     post_link = f"https://discord.com/channels/{submitter.guild.id}/{thread.id}"
@@ -33,12 +33,12 @@ async def forward_private_details(submitter: discord.Member, executor: discord.M
         color=discord.Color.blurple()
     )
     try:
-        await private_thread.send(
+        await private_channel.send(
             content=f"Hey {executor.mention}, you have received a submission.",
             embed=embed
         )
     except Exception as e:
-        logger.error(f"Failed to send to private data thread: {e}")
+        logger.error(f"Failed to send to private data channel: {e}")
 
 class PrivateSubmitView(discord.ui.View):
     """

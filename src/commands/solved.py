@@ -237,7 +237,11 @@ class SolvedButton(ui.Button):
                         struck_parts.append(part)
                 original_embed.description = '\n\n'.join(struck_parts)
 
-            await interaction.message.edit(embed=original_embed, view=None)
+            try:
+                await interaction.message.edit(embed=original_embed, view=None)
+            except discord.NotFound:
+                # Message might have been deleted, continue anyway
+                pass
 
             new_embed = discord.Embed(
                 title="Post Solved",

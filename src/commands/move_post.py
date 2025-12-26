@@ -76,7 +76,7 @@ class MovePost(commands.Cog):
             initial += f"\n\n__**Original Message:**__\n{content}"
         if files:
             initial += f"\n\nAttached {len(files)} file(s)"
-        initial += f"\n\n-# This post is moved by {interaction.user.mention}"
+
 
         new_thread = await forum.create_thread(
             name=title,

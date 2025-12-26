@@ -84,6 +84,15 @@ class IncompletePost(commands.Cog):
         self.bot = bot
         bot.incomplete_views = {}
 
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        # Clean up persistent views from database when messages are deleted
+        try:
+            await self.bot.db.remove_view(payload.message_id)
+        except Exception:
+            # View might not exist in database, which is fine
+            pass
+
     @app_commands.command(name="incomplete-post", description="Mark the current post as incomplete and request more info.")
     async def incomplete_post(self, interaction: discord.Interaction):
         thread = interaction.channel
@@ -125,7 +134,11 @@ class IncompletePost(commands.Cog):
             embed=embed
         )
         view = IncompletePostView(self.bot, thread, owner_id, sent.id)
-        await sent.edit(view=view)
+        try:
+            await sent.edit(view=view)
+        except (discord.NotFound, AttributeError):
+            # Message might have been deleted, continue anyway
+            pass
         await view.start_timer(delay_seconds)
 
         await self.bot.db.add_view(
