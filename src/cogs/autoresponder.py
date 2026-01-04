@@ -66,14 +66,14 @@ class AutoResponder(commands.Cog):
             try:
                 if re.search(ar['regex'], message.content, re.IGNORECASE):
                     # Check cooldown
-                    last_trigger = await self.bot.db.get_last_autoresponse_trigger(message.author.id, ar['id'])
+                    last_trigger = await self.bot.db.get_last_autoresponse_trigger(message.author.id, ar['id'], message.channel.id)
                     cooldown_seconds = ar['cooldown_minutes'] * 60
                     if last_trigger and (current_time - last_trigger) < cooldown_seconds:
                         continue  # Skip this response due to cooldown
 
                     response = ar['response_message'].replace("${usermention}", message.author.mention)
                     await message.reply(response)
-                    await self.bot.db.set_autoresponse_trigger(message.author.id, ar['id'])
+                    await self.bot.db.set_autoresponse_trigger(message.author.id, ar['id'], message.channel.id)
                     break  # Only respond to the first match
             except re.error:
                 # Invalid regex, skip

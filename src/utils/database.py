@@ -79,8 +79,9 @@ class Database:
                 CREATE TABLE IF NOT EXISTS autoresponse_cooldowns (
                     user_id INTEGER NOT NULL,
                     autoresponse_id INTEGER NOT NULL,
+                    channel_id INTEGER NOT NULL,
                     triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (user_id, autoresponse_id)
+                    PRIMARY KEY (user_id, autoresponse_id, channel_id)
                 )
             """)
 
@@ -101,6 +102,23 @@ class Database:
             if 'cooldown_minutes' not in column_names:
                 await db.execute("ALTER TABLE autoresponses ADD COLUMN cooldown_minutes INTEGER DEFAULT 10")
                 print("Added cooldown_minutes column to autoresponses table")
+
+            # Migration: Add channel_id column to autoresponse_cooldowns if it doesn't exist
+            cursor = await db.execute("PRAGMA table_info(autoresponse_cooldowns)")
+            columns = await cursor.fetchall()
+            column_names = [col[1] for col in columns]
+            if 'channel_id' not in column_names:
+                await db.execute("DROP TABLE IF EXISTS autoresponse_cooldowns")
+                await db.execute("""
+                    CREATE TABLE autoresponse_cooldowns (
+                        user_id INTEGER NOT NULL,
+                        autoresponse_id INTEGER NOT NULL,
+                        channel_id INTEGER NOT NULL,
+                        triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (user_id, autoresponse_id, channel_id)
+                    )
+                """)
+                print("Added channel_id column to autoresponse_cooldowns table")
 
             await db.commit()
 
@@ -392,24 +410,24 @@ class Database:
                     pass  # Not an int, ignore
             await db.commit()
 
-    async def set_autoresponse_trigger(self, user_id: int, autoresponse_id: int):
+    async def set_autoresponse_trigger(self, user_id: int, autoresponse_id: int, channel_id: int):
         """Record when a user triggers an autoresponse"""
         import time
         current_time = int(time.time())
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
-                INSERT OR REPLACE INTO autoresponse_cooldowns (user_id, autoresponse_id, triggered_at)
-                VALUES (?, ?, ?)
-            """, (user_id, autoresponse_id, current_time))
+                INSERT OR REPLACE INTO autoresponse_cooldowns (user_id, autoresponse_id, channel_id, triggered_at)
+                VALUES (?, ?, ?, ?)
+            """, (user_id, autoresponse_id, channel_id, current_time))
             await db.commit()
 
-    async def get_last_autoresponse_trigger(self, user_id: int, autoresponse_id: int):
+    async def get_last_autoresponse_trigger(self, user_id: int, autoresponse_id: int, channel_id: int):
         """Get the timestamp when a user last triggered an autoresponse"""
         async with aiosqlite.connect(self.db_path) as db:
             async with db.execute("""
                 SELECT triggered_at FROM autoresponse_cooldowns
-                WHERE user_id = ? AND autoresponse_id = ?
-            """, (user_id, autoresponse_id)) as cursor:
+                WHERE user_id = ? AND autoresponse_id = ? AND channel_id = ?
+            """, (user_id, autoresponse_id, channel_id)) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row else None
 
