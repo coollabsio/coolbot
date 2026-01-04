@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-VERSION = "v4.0 Stable"
+VERSION = "v4.1 Stable"
 
 class PingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
