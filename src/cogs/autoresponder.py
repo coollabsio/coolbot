@@ -24,6 +24,7 @@ class AutoresponseView(ui.View):
         embed.set_footer(text=f"(Page {self.current_page+1}/{self.max_pages})")
         embed.add_field(name="ID", value=f"```py\n{ar['id']}\n```", inline=True)
         embed.add_field(name="Name", value=f"```py\n{ar['name']}\n```", inline=True)
+        embed.add_field(name="Cooldown (in minutes)", value=f"```py\n{ar['cooldown_minutes']}\n```", inline=True)
         embed.add_field(name="Regex", value=f"```py\n{ar['regex']}\n```", inline=False)
         embed.add_field(name="Response", value=f"```ruby\n{ar['response_message']}\n```", inline=False)
         return embed
@@ -58,12 +59,21 @@ class AutoResponder(commands.Cog):
             return
 
         # Check if message content matches any autoresponse regex
+        import time
+        current_time = int(time.time())
         autoresponses = await self.bot.db.get_autoresponses()
         for ar in autoresponses:
             try:
                 if re.search(ar['regex'], message.content, re.IGNORECASE):
+                    # Check cooldown
+                    last_trigger = await self.bot.db.get_last_autoresponse_trigger(message.author.id, ar['id'])
+                    cooldown_seconds = ar['cooldown_minutes'] * 60
+                    if last_trigger and (current_time - last_trigger) < cooldown_seconds:
+                        continue  # Skip this response due to cooldown
+
                     response = ar['response_message'].replace("${usermention}", message.author.mention)
                     await message.reply(response)
+                    await self.bot.db.set_autoresponse_trigger(message.author.id, ar['id'])
                     break  # Only respond to the first match
             except re.error:
                 # Invalid regex, skip
@@ -79,14 +89,16 @@ class AutoResponder(commands.Cog):
     @app_commands.describe(
         name="Unique name for the autoresponse",
         regex="Regex pattern to match in messages",
-        response="Response message to send (use ${usermention} to mention the user)"
+        response="Response message to send (use ${usermention} to mention the user)",
+        cooldown="Cooldown in minutes before a user can trigger this again (default: 10)"
     )
     async def add_autoresponse(
         self,
         interaction: discord.Interaction,
         name: str,
         regex: str,
-        response: str
+        response: str,
+        cooldown: int = 10
     ):
         # Check authorization
         if not any(role.id == AUTHORIZED_ROLE_ID for role in getattr(interaction.user, 'roles', [])):
@@ -107,9 +119,9 @@ class AutoResponder(commands.Cog):
             return
 
         try:
-            await self.bot.db.add_autoresponse(name, regex, response)
+            await self.bot.db.add_autoresponse(name, regex, response, cooldown)
             await interaction.response.send_message(
-                f"Autoresponse `{name}` added successfully.",
+                f"Autoresponse `{name}` added successfully with {cooldown} minute(s) cooldown.",
                 ephemeral=True
             )
         except Exception as e:

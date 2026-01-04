@@ -70,7 +70,17 @@ class Database:
                     name TEXT UNIQUE NOT NULL,
                     regex TEXT NOT NULL,
                     response_message TEXT NOT NULL,
+                    cooldown_minutes INTEGER DEFAULT 10,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS autoresponse_cooldowns (
+                    user_id INTEGER NOT NULL,
+                    autoresponse_id INTEGER NOT NULL,
+                    triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, autoresponse_id)
                 )
             """)
 
@@ -83,6 +93,15 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Migration: Add cooldown_minutes column if it doesn't exist
+            cursor = await db.execute("PRAGMA table_info(autoresponses)")
+            columns = await cursor.fetchall()
+            column_names = [col[1] for col in columns]
+            if 'cooldown_minutes' not in column_names:
+                await db.execute("ALTER TABLE autoresponses ADD COLUMN cooldown_minutes INTEGER DEFAULT 10")
+                print("Added cooldown_minutes column to autoresponses table")
+
             await db.commit()
 
     async def create_tables(self):
@@ -344,13 +363,13 @@ class Database:
             await db.commit()
 
     # Autoresponses methods
-    async def add_autoresponse(self, name: str, regex: str, response_message: str):
+    async def add_autoresponse(self, name: str, regex: str, response_message: str, cooldown_minutes: int = 10):
         """Add a new autoresponse"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
-                INSERT INTO autoresponses (name, regex, response_message)
-                VALUES (?, ?, ?)
-            """, (name, regex, response_message))
+                INSERT INTO autoresponses (name, regex, response_message, cooldown_minutes)
+                VALUES (?, ?, ?, ?)
+            """, (name, regex, response_message, cooldown_minutes))
             await db.commit()
 
     async def get_autoresponses(self):
@@ -371,6 +390,35 @@ class Database:
                     await db.execute("DELETE FROM autoresponses WHERE id = ?", (int(identifier),))
                 except ValueError:
                     pass  # Not an int, ignore
+            await db.commit()
+
+    async def set_autoresponse_trigger(self, user_id: int, autoresponse_id: int):
+        """Record when a user triggers an autoresponse"""
+        import time
+        current_time = int(time.time())
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                INSERT OR REPLACE INTO autoresponse_cooldowns (user_id, autoresponse_id, triggered_at)
+                VALUES (?, ?, ?)
+            """, (user_id, autoresponse_id, current_time))
+            await db.commit()
+
+    async def get_last_autoresponse_trigger(self, user_id: int, autoresponse_id: int):
+        """Get the timestamp when a user last triggered an autoresponse"""
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("""
+                SELECT triggered_at FROM autoresponse_cooldowns
+                WHERE user_id = ? AND autoresponse_id = ?
+            """, (user_id, autoresponse_id)) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else None
+
+    async def cleanup_old_triggers(self):
+        """Remove trigger records older than 30 days"""
+        import time
+        cutoff_time = int(time.time()) - (30 * 24 * 60 * 60)
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("DELETE FROM autoresponse_cooldowns WHERE triggered_at < ?", (cutoff_time,))
             await db.commit()
 
     # Automoderation rules methods
