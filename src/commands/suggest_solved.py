@@ -1,8 +1,6 @@
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
-import asyncio
-import datetime
 
 from config import (
     SUPPORT_CHANNEL_ID,
@@ -45,7 +43,6 @@ class SuggestSolved(commands.Cog):
             )
             return
 
-        # Only allow authorized roles to use this command
         if not any(role.id == AUTHORIZED_ROLE_ID for role in getattr(interaction.user, 'roles', [])):
             await interaction.response.send_message(
                 "You are not authorized to use this command.",
@@ -95,52 +92,6 @@ class SuggestSolved(commands.Cog):
                     view=view,
                     allowed_mentions=discord.AllowedMentions(users=True)
                 )
-            await interaction.followup.send(
-                "Suggestion sent to the post owner.",
-                ephemeral=True
-            )
-        except discord.Forbidden:
-            await interaction.followup.send(
-                "I don't have permission to send messages in this thread.",
-                ephemeral=True
-            )
-        except discord.HTTPException:
-            await interaction.followup.send(
-                "Failed to send the suggestion. Please try again later.",
-                ephemeral=True
-            )
-            return
-
-        # Skip if already solved
-        solved_tag = thread.parent.get_tag(SOLVED_TAG_ID)
-        if solved_tag in thread.applied_tags:
-            await interaction.followup.send(
-                "This thread is already marked as solved.",
-                ephemeral=True
-            )
-            return
-
-        embed = discord.Embed(
-            title="Mark as Solved?",
-            description=(
-                "It looks like your issue might be solved. "
-                "If that's the case, please click the button below to mark this post as solved."
-            ),
-            color=discord.Color.green()
-        )
-
-        solved_button = SolvedButton(self.bot, thread)
-        view = ui.View(timeout=None)
-        view.add_item(solved_button)
-
-        # Reply to owner's last message
-        try:
-            await last_owner_msg.reply(
-                embed=embed,
-                view=view,
-                mention_author=True,
-                allowed_mentions=discord.AllowedMentions(users=True)
-            )
             await interaction.followup.send(
                 "Suggestion sent to the post owner.",
                 ephemeral=True
