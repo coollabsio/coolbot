@@ -3,7 +3,6 @@ from discord.ext import commands
 from discord.ui import View, button, Button
 
 from config import (
-    GENERAL_CHANNEL_ID,
     SUPPORT_CHANNEL_ID,
     COMMUNITY_SUPPORT_CHANNEL_ID,
     AUTHORIZED_ROLE_ID,
@@ -59,9 +58,11 @@ class CreatePost(commands.Cog):
         if message.author == self.bot.user:
             return
 
-        # only react in general when bot is mentioned on a reply
+        # react in any regular channel when bot is mentioned on a reply,
+        # except inside the support forums themselves
         if (
-            message.channel.id == GENERAL_CHANNEL_ID
+            not isinstance(message.channel, discord.Thread)
+            and message.channel.id not in {SUPPORT_CHANNEL_ID, COMMUNITY_SUPPORT_CHANNEL_ID}
             and message.reference
             and self.bot.user in message.mentions
         ):
@@ -122,7 +123,7 @@ class CreatePost(commands.Cog):
             # post-move actions
             if thread_msg:
                 await self.send_support_embed(thread_msg)
-                await self.send_general_notification(replied_message, thread_msg)
+                await self.send_source_notification(replied_message, thread_msg)
                 await self.send_log(message, replied_message, content, files, thread_msg)
 
             # cleanup originals
@@ -175,13 +176,12 @@ class CreatePost(commands.Cog):
         )
         await thread_msg.channel.send(embed=embed)
 
-    async def send_general_notification(self, replied_message, thread_msg):
-        gen = self.bot.get_channel(GENERAL_CHANNEL_ID)
-        if gen:
-          await gen.send(
-              f"Hey {replied_message.author.mention}! We’ve moved your message to the support channel so it’s easier for everyone to assist. You can continue the conversation here: {thread_msg.jump_url}\n"
-              "-# Friendly reminder: Using the support channels for questions (even quick yes/no ones) helps us get you answers faster and keeps things organized!"
-          )
+    async def send_source_notification(self, replied_message, thread_msg):
+        source_channel = replied_message.channel
+        await source_channel.send(
+            f"Hey {replied_message.author.mention}! We’ve moved your message to the support channel so it’s easier for everyone to assist. You can continue the conversation here: {thread_msg.jump_url}\n"
+            "-# Friendly reminder: Using the support channels for questions (even quick yes/no ones) helps us get you answers faster and keeps things organized!"
+        )
 
 
     async def send_log(self, message, replied_message, content, files, thread_msg):
