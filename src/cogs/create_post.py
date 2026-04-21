@@ -58,6 +58,10 @@ class CreatePost(commands.Cog):
         if message.author == self.bot.user:
             return
 
+        # this flow only applies to guild messages
+        if message.guild is None:
+            return
+
         # react in any regular channel when bot is mentioned on a reply,
         # except inside the support forums themselves
         if (
@@ -178,10 +182,16 @@ class CreatePost(commands.Cog):
 
     async def send_source_notification(self, replied_message, thread_msg):
         source_channel = replied_message.channel
-        await source_channel.send(
-            f"Hey {replied_message.author.mention}! We’ve moved your message to the support channel so it’s easier for everyone to assist. You can continue the conversation here: {thread_msg.jump_url}\n"
-            "-# Friendly reminder: Using the support channels for questions (even quick yes/no ones) helps us get you answers faster and keeps things organized!"
-        )
+        try:
+            await source_channel.send(
+                f"Hey {replied_message.author.mention}! We’ve moved your message to the support channel so it’s easier for everyone to assist. You can continue the conversation here: {thread_msg.jump_url}\n"
+                "-# Friendly reminder: Using the support channels for questions (even quick yes/no ones) helps us get you answers faster and keeps things organized!"
+            )
+        except (discord.Forbidden, discord.HTTPException, discord.NotFound) as error:
+            print(
+                f"Failed to send source notification in channel "
+                f"{getattr(source_channel, 'id', 'unknown')}: {error}"
+            )
 
 
     async def send_log(self, message, replied_message, content, files, thread_msg):
