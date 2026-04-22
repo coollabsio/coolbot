@@ -67,6 +67,11 @@ class CreatePost(commands.Cog):
             and message.reference
             and self.bot.user in message.mentions
         ):
+            replied = await self.get_replied_message(message)
+            if replied is None or replied.author.bot:
+                await self.bot.process_commands(message)
+                return
+
             authorized_role = discord.utils.get(
                 message.guild.roles, id=AUTHORIZED_ROLE_ID
             )
@@ -75,8 +80,7 @@ class CreatePost(commands.Cog):
                 await message.delete()
                 return
 
-            # fetch the original message and show embed with buttons
-            replied = await message.channel.fetch_message(message.reference.message_id)
+            # fetch original message and show embed with buttons
             view = ChannelSelectView(self, message, replied)
             embed = discord.Embed(description="Which channel would you like to move this message to?")
             await message.reply(
@@ -86,6 +90,22 @@ class CreatePost(commands.Cog):
             )
             return
         await self.bot.process_commands(message)
+
+    async def get_replied_message(self, message: discord.Message):
+        reference = message.reference
+        if reference is None:
+            return None
+
+        if isinstance(reference.resolved, discord.Message):
+            return reference.resolved
+
+        if reference.message_id is None:
+            return None
+
+        try:
+            return await message.channel.fetch_message(reference.message_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return None
 
     async def process_move(
         self,
