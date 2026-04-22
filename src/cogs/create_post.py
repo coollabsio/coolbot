@@ -63,6 +63,7 @@ class CreatePost(commands.Cog):
         if (
             not isinstance(message.channel, discord.Thread)
             and message.channel.id not in {SUPPORT_CHANNEL_ID, COMMUNITY_SUPPORT_CHANNEL_ID}
+            and message.guild is not None
             and message.reference
             and self.bot.user in message.mentions
         ):
@@ -123,8 +124,16 @@ class CreatePost(commands.Cog):
             # post-move actions
             if thread_msg:
                 await self.send_support_embed(thread_msg)
-                await self.send_source_notification(replied_message, thread_msg)
-                await self.send_log(message, replied_message, content, files, thread_msg)
+                notification_failed = await self.send_source_notification(replied_message, thread_msg)
+                await self.send_log(
+                    message,
+                    replied_message,
+                    content,
+                    files,
+                    thread_msg,
+                    title="Post moved successfully." if not notification_failed else "Post moved with source notification failure.",
+                    description=None if not notification_failed else f"Source notification skipped: {notification_failed}"
+                )
 
             # cleanup originals
             await self.delete_original_messages(msgs)
@@ -178,16 +187,20 @@ class CreatePost(commands.Cog):
 
     async def send_source_notification(self, replied_message, thread_msg):
         source_channel = replied_message.channel
-        await source_channel.send(
-            f"Hey {replied_message.author.mention}! We’ve moved your message to the support channel so it’s easier for everyone to assist. You can continue the conversation here: {thread_msg.jump_url}\n"
-            "-# Friendly reminder: Using the support channels for questions (even quick yes/no ones) helps us get you answers faster and keeps things organized!"
-        )
+        try:
+            await source_channel.send(
+                f"Hey {replied_message.author.mention}! We’ve moved your message to the support channel so it’s easier for everyone to assist. You can continue the conversation here: {thread_msg.jump_url}\n"
+                "-# Friendly reminder: Using the support channels for questions (even quick yes/no ones) helps us get you answers faster and keeps things organized!"
+            )
+        except (discord.Forbidden, discord.HTTPException) as error:
+            return error
+        return None
 
 
-    async def send_log(self, message, replied_message, content, files, thread_msg):
+    async def send_log(self, message, replied_message, content, files, thread_msg, title="Post moved successfully.", description=None):
         logs = self.bot.get_channel(POST_CREATE_LOG_THREAD_ID)
         if logs:
-            log = discord.Embed(title="Post moved successfully.")
+            log = discord.Embed(title=title, description=description)
             log.add_field(name="Owner", value=replied_message.author.mention, inline=False)
             log.add_field(name="Moved by", value=message.author.mention, inline=False)
             log.add_field(name="Characters", value=len(content), inline=False)
